@@ -1,0 +1,285 @@
+#!/usr/bin/env php
+<?php
+/*
+|-----------------------------------------------------------------------------
+| Autor: Daniel da Costa e Faria
+| Inspirado pelo artisan do Laravel
+|-----------------------------------------------------------------------------
+*/
+define('appdir','apps');
+define('sisdir','sistema');
+
+//var_dump($argv);
+
+//$app = require 'sistema/helpers/AppMaker.php';
+require 'core/Functions.php';
+/*
+|-----------------------------------------------------------------------------
+| Lista de argumentos
+|-----------------------------------------------------------------------------
+*/
+$args  = $argv;
+
+/*
+|-----------------------------------------------------------------------------
+| O segundo argumento é uma chamada para a função create
+|-----------------------------------------------------------------------------
+*/
+if(isset($args[1]))
+{
+    $call = $args[1];
+}else{
+    echo "\e[1;37;41m Preciso saber o que quer fazer! \e[0m\n";
+    echo "\e[1;37;41m Faça uma chamada assim: php genesis create, para ver exemplos! \e[0m\n";
+    exit();
+}
+
+/*
+|------------------------------------------------------
+| Traduzindo o comando digitado pelo usuário
+| Pegando o nome da funcao selecionada pelo usuario
+|------------------------------------------------------
+*/
+$command = explode(':',$call);
+$function = $command[0];
+/*
+|----------------------------------------------------------------------
+| Depois de : deve ser informado o que será criado
+| Pode ser uma aplicacao, um controller uma view, uma interface
+|----------------------------------------------------------------------
+*/
+if(isset($command[1]))
+{
+    $type = $command[1];
+}else{
+    $type = '';
+}
+
+/*
+|-------------------------------------------------------------------------
+| O terceiro parametro é nome dado ao objeto criado
+| Ex.: php genesis create:application loja
+|-------------------------------------------------------------------------
+*/
+if(isset($args[2])){
+    $name = $args[2];
+}else{
+    $name = NULL;
+}
+
+/*
+|-------------------------------------------------------------------------------------
+| Caso o usuario crie um model, pode apontar um banco de dados para gerar os
+| models a partir do Class Builder. Pode se criar um Model apenas ou gerar todos os
+| models. O banco deve estar configurado em apps/config/database.php
+|-------------------------------------------------------------------------------------
+*/
+if(isset($args[3])){
+    $database = $args[3];
+}else{
+    $database ='';
+}
+
+
+/*
+|------------------------------------------------------------------------
+| Faz a chamada da função 
+| @param $function = nome da função
+| @param $type = qual tipo de objeto será criado
+| @param $name = qual o nome do objeto
+|------------------------------------------------------------------------
+*/
+call_user_func($function,$type,$name,$database);
+
+/**
+ * Function create - Usada para criar objetos pela linha de comando
+ * @param $type = tipo do objeto (application, controller, view, etc)
+ * @param $name = nome do objeto
+ */
+function create($type='',$name, $db=''){
+    if($type==''){
+        echo "\e[1;37;41m Comando create incompleto \e[0m";
+        echo "\e[1;37;41m Tente usar um destes comandos:
+         
+            create:application Cria uma nova aplicacao 
+            create:controller  Cria um novo controller na pasta indicada 
+            create:adminlte    Cria um painel de amdinistracao baseado no AdminLte
+            create:view        Cria uma nova view na pasta indicada  
+            create:model       Cria um model baseado na entidade indicada  
+        \e[0m\n";
+    }else{
+        switch ($type) {
+
+            case 'application':
+                try{
+                    if($name!='')
+                    {
+                        mkdir(appdir.'/'.$name);
+                        mkdir(appdir.'/'.$name.'/controllers');
+                        mkdir(appdir.'/'.$name.'/models');
+                        mkdir(appdir.'/'.$name.'/views');                        
+                        $handle = fopen(appdir.'/'.$name.'/controllers/home.php','w');
+                        $content  = "<?php \n";
+                        $name = str_replace('/','\\',$name);
+                        $content .= "namespace ".appdir."\\{$name}\\controllers; \n\n";
+                        $content .= "class HomeController extends \core\Controller{ \n\t";
+                        $content .= "public function index(){ \n\t\t";
+                        $content .= "echo \"Este é o início da aplicação {$name}\"; \n\t";    
+                        $content .= "}\n";             
+                        $content .= "}\n\t";
+                        fwrite($handle,$content);
+                        fclose($handle);
+                        echo "\e[0;32;12m Aplicacao {$name} criada com sucesso!\e[0m\n";
+                    }else{
+                        //Alertar erro ao nao informar o nome do controller
+                        echo "\e[0;32;12m Faltou informar o nome da aplicacao!\e[0m\n";
+                    }                    
+                }catch(Exception $e){
+                    echo "\e[0;32;12m Erro ao criar aplicacaoo!\e[0m\n";
+                }
+                
+            break;  
+            /*
+            |---------------------------------------------------------------------------------------------------
+            | Cria um sistema de login com Controllers, Models e Views usando adminLte
+            |---------------------------------------------------------------------------------------------------
+            */ 
+            case 'adminlte':
+                try{
+                    $handle = fopen(appdir.'/controllers/login.php','w');
+                    $content  = "<?php \n";
+                    $content .= "namespace \\".appdir."\\controllers; \n\n";
+                    $content .= "class LoginController extends core\Controller{ \n\t";
+                    $content .= "public function index(){ \n\t\t";
+                    $content .= "\$this->view('login');\n\t";    
+                    $content .= "}\n";              
+
+                    $content .= "public function post(){\n\t\t";
+                    $content .= "\$login = filterpost('login');\n\t\t";
+                    $content .= "\$senha = md5(filterpost('senha'));\n\t\t";
+                    $content .= "\$select = new Select('*','cienciasbiologicas','usuarios');\n\t\t";
+                    $content .= "\$select->where(\"login='{\$login}' and senha='{\$senha}' or email='\$login' and senha='\$senha' and ativo = 1\");\n\t\t";
+                    $content .= "\$dados = \$select->run();\n\t\t";
+                    $content .= "if(sizeof(\$dados)>0){\n\t\t";
+                    $content .= "\$dados = \$dados[0];\n\t\t";
+                    $content .= "\$_SESSION['logado'] = true;\n\t\t";
+                    $content .= "\$_SESSION['id']    = \$dados->id;\n\t\t";
+                    $content .= "\$_SESSION['nome']  = \$dados->nome;\n\t\t";
+                    $content .= "\$_SESSION['email'] = \$dados->email;\n\t\t";
+                    $content .= "\$_SESSION['ck_authorized']=true;\n\t\t";
+                    $content .= "if(filterpost('url')){\n\t\t";
+                    $content .= "redirect('painel#'.filterpost('url'));\n\t\t";
+                    $content .= "}else{\n\t\t\t";
+                    $content .= "redirect('painel');\n\t\t";
+                    $content .= "}\n\t";            
+                    $content .= "}else{\n\t\t\t";
+                    $content .= "echo '<div class=\"mensagem\">Erro</div>';\n\t\t";
+                    $content .= "\$dados['titulo'] = 'Falha de login';\n\t\t";
+                    $content .= "\$dados['mensagem'] = 'Usuario ou senha incorretos';\n\t\t";
+                    $content .= "\$this->view('modalerro',\$dados);\n\t";
+                    $content .= "}\n";        
+                    $content .= "}";
+                    fwrite($handle,$content);
+                    fclose($handle);
+                }catch(Exception $e){
+                    echo "\e[0;32;12m Erro ao criar login!\e[0m\n";
+                }
+            break;    
+            case 'controller':
+                
+                if($name!='')
+                {
+                   //Divide o endereco do controller 
+                   try{                    
+                    $location  = explode('/',$name);
+                    //Temos mais de um item informado na localizacao do controller. Nesse caso é uma subpasta
+                    if(sizeof($location)>1){
+                        //Se ela nao existe, criamos
+                        if(!is_dir(appdir.'/'.$location[0]))
+                        {
+                            mkdir(appdir.'/'.$location[0]);
+                        }
+                        //Dentro dela criamos a pasta controllers, caso ela nao exista ainda
+                        if(!is_dir(appdir.'/'.$location[0].'/controllers'))
+                        {
+                            mkdir(appdir.'/'.$location[0].'/controllers');
+                        }
+                        //Caso estejamos criando uma subpasta para a aplicacao especifica, entao verificamos se ela existe
+                        if(is_dir(appdir.'/'.$location[0].'/'.$location[1]))
+                        {
+                            if(isset($location[2]) and $location[2]!='')
+                            {
+                                $arquivo = appdir.'/'.$location[0].'/'.$location[1].'/controllers/'.$location[2].'.php';
+                                $namespace = appdir.'\\'.$location[0].'\\'.$location[1].'\\controllers';
+                                $class = $location[2];
+                            }else{
+                                //Alertar erro ao nao informar o nome do controller
+                                exit('Você não informou o nome do controller! >:('."\n");
+                            }
+                        }else{
+                            $arquivo = appdir.'/'.$location[0].'/controllers/'.$location[1].'.php';
+                            $namespace = appdir.'\\'.$location[0].'\\controllers';
+                            $class = $location[1];
+                        }                        
+                    }else{
+                        $arquivo = appdir.'/controllers/'.$location[0].'.php';
+                        $namespace = appdir.'\\controllers';
+                        $class = $location[0];
+                    }                    
+                    
+                    $class = ucfirst($class);
+                    $handle = fopen(strtolower($arquivo),'w');
+                    //$namespace = str_replace('/','\\',$name);
+                    $content  = "<?php \n";
+                    $content .= "namespace {$namespace}; \n\n";
+                    $content .= "class {$class}Controller extends \core\Controller{\n\t";
+                    $content .= "public function index(){ \n\t\t";
+                    $content .= "//Implementacao \n\t";    
+                    $content .= "}\n";             
+                    $content .= "}\n\t";
+                    fwrite($handle,$content);
+                    fclose($handle);
+                    echo "\e[0;32;12m Controller criado com sucesso!\e[0m\n";
+                    }catch(Exception $e){
+                        echo "\e[0;32;12m Controller criado com sucesso!\e[0m\n";
+                    } 
+                }else{
+                    echo "\e[0;37;41m                                           \e[0m\n";
+                    echo "\e[0;37;41m Preciso do nome do controller, por favor! Algo como  \e[0m\n";
+                    echo "\e[0;37;41m                                           \e[0m\n";
+                }
+            break;
+            
+            case 'view':
+                echo "\e[0;37;44m View criado com sucesso!\e[0m\n";
+            break;  
+            
+            case 'model':
+                try{
+                    require(sisdir.'/helpers/Classbuilder.php');
+                    $dburl = explode('.',$db);
+                   
+                    if(sizeof($dburl)>1)
+                    {
+                        $dbname = $dburl[0];
+                        $tablename = $dburl[1];
+                        $location  = explode('/',$name);
+                        if(sizeof($location)>1){
+                            $pasta = $location[0];
+                        }else{
+                            $pasta = './';
+                        }
+                        $builder = new helpers\Classbuilder;
+                        $builder->set_banco($dbname);
+                        $builder->connect($dbname);
+                        $builder->set_pasta($pasta);
+                        $builder->gerarentidade($tablename);
+                    } 
+                    echo "\e[0;37;44m Model criado com sucesso!\e[0m\n";
+                }catch(Exception $e){
+
+                }
+            break;    
+        }
+    }
+}
